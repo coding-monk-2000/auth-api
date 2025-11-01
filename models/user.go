@@ -11,6 +11,14 @@ type User struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type UserSafeResp struct {
+	ID        int       `json:"id"`
+	Username  string    `json:"username"`
+	Email     string    `json:"email"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type Credentials struct {
 	Username string `json:"username"`
 	Password string `json:"password"`

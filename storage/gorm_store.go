@@ -14,8 +14,8 @@ func NewGormStore(db *gorm.DB) *GormStore {
 	return &GormStore{DB: db}
 }
 
-func (s *GormStore) Register(user models.User) error {
-	return s.DB.Create(&user).Error
+func (s *GormStore) Register(user *models.User) error {
+	return s.DB.Create(user).Error
 }
 
 func (s *GormStore) GetUser(creds models.Credentials) (*models.User, error) {
