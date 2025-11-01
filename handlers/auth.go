@@ -29,13 +29,22 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 	user.Password = string(hashed)
 
-	if err := h.Store.Register(user); err != nil {
-		http.Error(w, "Failed to insert message", http.StatusInternalServerError)
+	// Register expects a pointer so GORM can populate ID/timestamps
+	if err := h.Store.Register(&user); err != nil {
+		http.Error(w, "Failed to create user", http.StatusInternalServerError)
 		return
 	}
 
+	resp := models.UserSafeResp{
+		ID:        user.ID,
+		Username:  user.Username,
+		Email:     user.Email,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+	}
+
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(user)
+	json.NewEncoder(w).Encode(resp)
 }
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
@@ -44,12 +53,12 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	usr, err := h.Store.GetUser(creds)
 	if err != nil || usr == nil {
-		http.Error(w, "invalid username or password1", http.StatusUnauthorized)
+		http.Error(w, "invalid username or password", http.StatusUnauthorized)
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(usr.Password), []byte(creds.Password)); err != nil {
-		http.Error(w, "invalid username or password2", http.StatusUnauthorized)
+		http.Error(w, "invalid username or password", http.StatusUnauthorized)
 		return
 	}
 
