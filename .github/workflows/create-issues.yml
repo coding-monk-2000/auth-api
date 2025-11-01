@@ -1,0 +1,61 @@
+name: Create issues from .github/issues
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  create-issues:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create issues from files
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = '.github/issues';
+            if (!fs.existsSync(path)) {
+              core.info(`${path} not found, nothing to do.`);
+              return;
+            }
+
+            const files = fs.readdirSync(path).filter(f => f.endsWith('.md'));
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // Fetch current open & closed issues once (small repos ok)
+            const existing = await github.rest.issues.listForRepo({ owner, repo, per_page: 100 });
+            const existingTitles = new Set(existing.data.map(i => i.title));
+
+            for (const file of files) {
+              const fullPath = `${path}/${file}`;
+              const content = fs.readFileSync(fullPath, 'utf8').trim();
+              if (!content) continue;
+
+              // Take first H1 line as title: "# Title"
+              const firstLine = content.split('\n').find(l => l.trim().length > 0) || '';
+              const title = firstLine.replace(/^#\s*/, '').trim();
+              if (!title) continue;
+
+              if (existingTitles.has(title)) {
+                core.info(`Skipping existing issue: ${title}`);
+                continue;
+              }
+
+              await github.rest.issues.create({
+                owner,
+                repo,
+                title,
+                body: content,
+              });
+              core.info(`Created issue: ${title}`);
+            }
