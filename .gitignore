@@ -6,7 +6,7 @@ main
 .vscode/
 
 # Environment files
-.env
+#.env
 
 
 # Coverage and test artifacts
