@@ -10,11 +10,9 @@ import (
 	"time"
 
 	"github.com/coding-monk-2000/auth-api/config"
-	"github.com/coding-monk-2000/auth-api/handlers"
-	"github.com/coding-monk-2000/auth-api/middleware"
+	"github.com/coding-monk-2000/auth-api/server"
 	"github.com/coding-monk-2000/auth-api/storage"
 
-	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 )
 
@@ -32,11 +30,7 @@ func main() {
 		log.Fatalf("failed to initialize database: %v", err)
 	}
 
-	r := mux.NewRouter()
-	h := &handlers.AuthHandler{Store: db}
-	r.HandleFunc("/register", h.Register).Methods("POST")
-	r.HandleFunc("/login", h.Login).Methods("POST")
-	r.Handle("/messages", middleware.AuthMiddleware(http.HandlerFunc(handlers.ProxyToMessages))).Methods("GET")
+	r := server.NewRouter(cfg, db)
 
 	addr := ":" + cfg.Port
 	server := &http.Server{
