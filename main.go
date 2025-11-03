@@ -11,6 +11,7 @@ import (
 
 	"github.com/coding-monk-2000/auth-api/config"
 	"github.com/coding-monk-2000/auth-api/handlers"
+	"github.com/coding-monk-2000/auth-api/middleware"
 	"github.com/coding-monk-2000/auth-api/storage"
 
 	"github.com/gorilla/mux"
@@ -35,7 +36,7 @@ func main() {
 	h := &handlers.AuthHandler{Store: db}
 	r.HandleFunc("/register", h.Register).Methods("POST")
 	r.HandleFunc("/login", h.Login).Methods("POST")
-	r.HandleFunc("/messages", handlers.ProxyToMessages).Methods("GET")
+	r.Handle("/messages", middleware.AuthMiddleware(http.HandlerFunc(handlers.ProxyToMessages))).Methods("GET")
 
 	addr := ":" + cfg.Port
 	server := &http.Server{

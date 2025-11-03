@@ -21,5 +21,8 @@ func (s *GormStore) Register(user *models.User) error {
 func (s *GormStore) GetUser(creds models.Credentials) (*models.User, error) {
 	var user models.User
 	err := s.DB.Where("username = ?", creds.Username).First(&user).Error
-	return &user, err
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
 }

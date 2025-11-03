@@ -3,18 +3,20 @@ package handlers
 import (
 	"io"
 	"net/http"
+	"time"
+
 	"github.com/coding-monk-2000/auth-api/utils"
 )
 
 func ProxyToMessages(w http.ResponseWriter, r *http.Request) {
-	tokenStr := r.Header.Get("Authorization")
+	tokenStr := utils.ExtractTokenFromHeader(r.Header.Get("Authorization"))
 	token, err := utils.ValidateToken(tokenStr)
 	if err != nil || !token.Valid {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: 5 * time.Second}
 	req, err := http.NewRequest("GET", "http://localhost:8080/messages", nil) // adjust method and URL as needed
 	if err != nil {
 		http.Error(w, "Failed to create request", http.StatusInternalServerError)
@@ -30,7 +32,10 @@ func ProxyToMessages(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	// Step 3: Copy response back to client
+	for k, v := range resp.Header {
+		w.Header()[k] = v
+	}
+
 	w.WriteHeader(resp.StatusCode)
 	io.Copy(w, resp.Body)
 }

@@ -2,9 +2,13 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
+	"regexp"
+	"strings"
 
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 
 	"github.com/coding-monk-2000/auth-api/models"
 	"github.com/coding-monk-2000/auth-api/storage"
@@ -19,6 +23,12 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var user models.User
 	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if errs := validateRegister(user); len(errs) > 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string][]string{"errors": errs})
 		return
 	}
 
@@ -49,10 +59,29 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var creds models.Credentials
-	json.NewDecoder(r.Body).Decode(&creds)
+	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Validate input
+	if errs := validateLogin(creds); len(errs) > 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string][]string{"errors": errs})
+		return
+	}
 
 	usr, err := h.Store.GetUser(creds)
-	if err != nil || usr == nil {
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "invalid username or password", http.StatusUnauthorized)
+			return
+		}
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if usr == nil {
 		http.Error(w, "invalid username or password", http.StatusUnauthorized)
 		return
 	}
@@ -71,11 +100,43 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func ValidateToken(w http.ResponseWriter, r *http.Request) {
-	tokenStr := r.Header.Get("Authorization")
+	tokenStr := utils.ExtractTokenFromHeader(r.Header.Get("Authorization"))
 	token, err := utils.ValidateToken(tokenStr)
-	if err != nil || !token.Valid {
+	if err != nil || token == nil || !token.Valid {
 		http.Error(w, "Invalid token", http.StatusUnauthorized)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+func validateRegister(u models.User) []string {
+	var errs []string
+	if strings.TrimSpace(u.Username) == "" {
+		errs = append(errs, "username is required")
+	}
+	if strings.TrimSpace(u.Password) == "" {
+		errs = append(errs, "password is required")
+	}
+	if u.Email != "" {
+		if !validEmail(u.Email) {
+			errs = append(errs, "email is invalid")
+		}
+	}
+	return errs
+}
+
+func validateLogin(c models.Credentials) []string {
+	var errs []string
+	if strings.TrimSpace(c.Username) == "" {
+		errs = append(errs, "username is required")
+	}
+	if strings.TrimSpace(c.Password) == "" {
+		errs = append(errs, "password is required")
+	}
+	return errs
+}
+
+func validEmail(email string) bool {
+	var re = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)
+	return re.MatchString(email)
 }
